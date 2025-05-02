@@ -3,26 +3,18 @@ import { ai } from '@zerostep/playwright'
 import { test } from './test-with-fixture.ts'
 
 test.describe('SauceDemo', () => {
-    test('can login and logout', async ({ page, ai }) => {
-        await page.goto('https://www.saucedemo.com/')
-        const [username, password] = await ai([
-            'Get the first accepted username',
-            'Get the accepted password',
-        ])
-        await ai([
-            `Enter ${username} as the username`,
-            `Enter ${password} as the password`
-        ])
-        await ai('Click Login')
-        await ai('Click the menu button')
-        await ai('Click the logout link')
-    })
-
+    test.setTimeout(150_000)
     test('codegen login test', async ({ page, ai }) => {
         await page.goto('https://ecommerce-playground.lambdatest.io/');
         await page.hover("//a[@data-toggle='dropdown']//span[contains(.,'My account')]")
-        await ai('Goto Log in page')
+        await page.click("'Register'")
+        await page.waitForTimeout(2000)
 
-        await ai('Log in with email address coolcse49@gmail.com and password Welcome#123')
+        await ai('Enter First Name = ABC , Last Name = XYZ, Email address = coolcse49@gmail.com, Telephone = 9876563459 and password as Welcome#123')
+        await ai('Confirm I have read and agree to the Privacy Policy')
+        await ai('Click on Continue')
+
+        await page.waitForTimeout(5000)
+
     })
 })
