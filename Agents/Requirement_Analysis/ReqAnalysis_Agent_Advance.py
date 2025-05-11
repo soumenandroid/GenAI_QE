@@ -52,7 +52,7 @@ if req_docs:
                 temp_file.write(source_docs.read())
                 saved_pdf_paths.append(temp_file.name)  # Store the path
     
-    st.write(saved_pdf_paths[0])
+    #st.write(saved_pdf_paths[0])
 
 
 
@@ -86,55 +86,80 @@ class GenerationTool(BaseTool):
 
 generation_tool=GenerationTool()
 web_search_tool = SearchTool()
+
 pdf_search_tool = PDFSearchTool(pdf=saved_pdf_paths[0],
-        config=dict(
-            llm=dict(
-                provider="groq", # or google, openai, anthropic, llama2, ...
                 config=dict(
-                    model="llama3-8b-8192",
-                    api_key=api_key
-                    # temperature=0.5,
-                    # top_p=1,
-                    # stream=true,
-                ),
-            ),
-            embedder=dict(
-                provider="huggingface", # or openai, ollama, ...
-                config=dict(
-                    model="BAAI/bge-small-en-v1.5",
-                    #task_type="retrieval_document",
-                    # title="Embeddings",
-                ),
-            ),
-        )
-    )
+                    llm=dict(
+                        provider="groq", # or google, openai, anthropic, llama2, ...
+                        config=dict(
+                            model="llama3-8b-8192",
+                            api_key=api_key
+                            # temperature=0.5,
+                            # top_p=1,
+                            # stream=true,
+                        ),
+                    ),
+                    embedder=dict(
+                        provider="huggingface", # or openai, ollama, ...
+                        config=dict(
+                            model="BAAI/bge-small-en-v1.5",
+                            #task_type="retrieval_document",
+                            # title="Embeddings",
+                        ),
+                    ),
+                )
+            )
+
+class RAG_Tool(PDFSearchTool):
+    name: str= "Retriever tool"
+    description: str ="Useful for vectorstore based queries. Use this to find information from PDF"
+    
+    def _run(self, query: str) -> str:
+        return pdf_search_tool.run(query)
+
+rag_tool=RAG_Tool()
+
+from crewai.tools  import tool
+@tool
+def router_tool(question):
+  """Router Function"""
+  if 'requirements' in question:
+    return 'vectorstore'
+  elif 'industry':
+    return 'websearch'
+  else:
+      return 'generate'
 
 """ AGENT """
 
 Router_Agent = Agent(
   role='Router',
-  goal='Route user question to a vectorstore or web search',
+  goal='Route user question to a vectorstore or web search or generation',
   backstory=(
-    "You are an expert at routing a user question to a vectorstore or web search ."
-    "Use the vectorstore for questions on requirement document or tiny llm or finetuning of llm."
+    "You are an expert at routing a user question to a vectorstore or web search or generation."
+    "Use the vectorstore for questions on requirement document."
     "use web-search for question on industry best practices."
     "use generation for generic questions otherwise"
   ),
   verbose=True,
   allow_delegation=False,
-  llm=llm,
+  llm=llm1,
 )
+
 Retriever_Agent = Agent(
 role="Retriever",
-goal="Use the information retrieved from the vectorstore to answer the question",
+goal="""Based on the response from the router task extract information for the question {question} with the help of the respective tool.
+    Use the web_serach_tool to retrieve information from the web in case the router task output is 'websearch'.
+    Use the rag_tool to retrieve information from the vectorstore in case the router task output is 'vectorstore'.
+    otherwise generate the output basedob your own knowledge in case the router task output is 'generate'.""",
 backstory=(
     "You are an assistant for question-answering tasks."
     "Use the information present in the retrieved context to answer the question."
-    "You have to provide a clear concise answer within 200 words."
+    "You have to provide a clear concise answer within 20 words."
 ),
 verbose=True,
 allow_delegation=False,
-llm=llm,
+llm=llm1,
 )
 
 
@@ -151,6 +176,7 @@ router_task = Task(
     expected_output=("Give a  choice 'websearch' or 'vectorstore' or 'generate' based on the question"
     "Do not provide any other premable or explaination."),
     agent=Router_Agent,
+    tools=[router_tool]
    )
 
 retriever_task = Task(
@@ -161,7 +187,7 @@ retriever_task = Task(
     ),
     expected_output=("You should analyse the output of the 'router_task'"
     "If the response is 'websearch' then use the web_search_tool to retrieve information from the web."
-    "If the response is 'vectorstore' then use the rag_tool to retrieve information from the vectorstore."
+    "If the response is 'vectorstore' then use the pdf_search_tool to retrieve information from the vectorstore."
     "If the response is 'generate' then use then use generation_tool ."
     "otherwise say i dont know if you dont know the answer"
 
@@ -182,7 +208,9 @@ rag_crew = Crew(
 
     # Add content from a file
 question=st.text_input(label="Ask question")
-if question:
+if 'requirement' in question:
+    result = pdf_search_tool.run(question)
+else:
     inputs ={"question":question}
     result = rag_crew.kickoff(inputs=inputs)
-    st.write(result)
+st.write(result)
