@@ -24,7 +24,7 @@ class SearchTools():
     #payload = json.dumps({"q": query})
     payload = json.dumps(query)
     headers = {
-        'X-API-KEY':'afce7db6435d58024290963b565ac78eb87d7105f38408457ebc9bf67adb5d4a',
+        'X-API-KEY':'<api-key>',
         'content-type': 'application/json'
     }
     response = requests.request("POST", url, headers=headers, data=payload)
